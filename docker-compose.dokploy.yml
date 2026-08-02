@@ -1,0 +1,57 @@
+# Dokploy compose — no host port publish.
+# Traefik / Dokploy must target container ports:
+#   HTTP  → proxy2vpn:8888
+#   SOCKS → proxy2vpn:1080
+#
+# PROXY_HTTP_PORT / PROXY_SOCKS_PORT are host-only (local compose).
+# On Dokploy, set the domain service port to 8888 or 1080.
+
+services:
+  proxy2vpn:
+    build: .
+    # image: your-registry/proxy2vpn-tunnel:latest
+    container_name: proxy2vpn
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    # Or: remove devices: and set CREATE_TUN_DEVICE=true
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+    environment:
+      - OPENVPN_PROVIDER=${OPENVPN_PROVIDER:-protonvpn}
+      - OPENVPN_CONFIG=${OPENVPN_CONFIG:-nl.protonvpn.udp}
+      - OPENVPN_USERNAME=${OPENVPN_USERNAME}
+      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
+      - LOCAL_NETWORK=${LOCAL_NETWORK:-192.168.0.0/16}
+      - PROXY_USER=${PROXY_USER:-}
+      - PROXY_PASSWORD=${PROXY_PASSWORD:-}
+      - CREATE_TUN_DEVICE=${CREATE_TUN_DEVICE:-false}
+      - VPN_CONFIG_SOURCE_REPO=${VPN_CONFIG_SOURCE_REPO:-haugene/vpn-configs-contrib}
+      - VPN_CONFIG_SOURCE_REVISION=${VPN_CONFIG_SOURCE_REVISION:-main}
+      - OPENVPN_OPTS=${OPENVPN_OPTS:-}
+    volumes:
+      - proxy2vpn-config:/config
+    # No ports: — Traefik hits container :8888 / :1080 on dokploy-network
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.docker.network=dokploy-network
+    #   - traefik.http.services.proxy2vpn.loadbalancer.server.port=8888
+    #   - traefik.http.routers.proxy2vpn.rule=Host(`proxy.example.com`)
+    #   - traefik.http.routers.proxy2vpn.entrypoints=websecure
+    #   - traefik.http.routers.proxy2vpn.tls.certresolver=letsencrypt
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  proxy2vpn-config:
+
+networks:
+  dokploy-network:
+    external: true

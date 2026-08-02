@@ -1,0 +1,40 @@
+services:
+  proxy2vpn:
+    build: .
+    container_name: proxy2vpn
+    cap_add:
+      - NET_ADMIN
+    # Option A (default): mount host TUN — keep CREATE_TUN_DEVICE=false
+    devices:
+      - /dev/net/tun
+    # Option B (haugene-style): drop devices: above and set CREATE_TUN_DEVICE=true
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+    environment:
+      - OPENVPN_PROVIDER=${OPENVPN_PROVIDER:-protonvpn}
+      - OPENVPN_CONFIG=${OPENVPN_CONFIG:-nl.protonvpn.udp}
+      - OPENVPN_USERNAME=${OPENVPN_USERNAME}
+      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
+      - LOCAL_NETWORK=${LOCAL_NETWORK:-192.168.0.0/16}
+      - PROXY_USER=${PROXY_USER:-}
+      - PROXY_PASSWORD=${PROXY_PASSWORD:-}
+      - CREATE_TUN_DEVICE=${CREATE_TUN_DEVICE:-false}
+      - VPN_CONFIG_SOURCE_REPO=${VPN_CONFIG_SOURCE_REPO:-haugene/vpn-configs-contrib}
+      - VPN_CONFIG_SOURCE_REVISION=${VPN_CONFIG_SOURCE_REVISION:-main}
+      - OPENVPN_OPTS=${OPENVPN_OPTS:-}
+    volumes:
+      - ./data/config:/config
+      # - ./custom-ovpn:/etc/openvpn/custom:ro
+    # Host:container — container always HTTP 8888, SOCKS 1080
+    # PROXY_SOCKS_PORT=7888 → clients use host:7888 → container:1080
+    # TCP required; UDP optional for SOCKS5 UDP ASSOCIATE
+    ports:
+      - "${PROXY_HTTP_PORT:-8888}:8888/tcp"
+      - "${PROXY_SOCKS_PORT:-1080}:1080/tcp"
+      - "${PROXY_SOCKS_PORT:-1080}:1080/udp"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
